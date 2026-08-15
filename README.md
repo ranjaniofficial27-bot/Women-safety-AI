@@ -73,12 +73,6 @@ Installation & Usage
 - Arduino IDE
 - Webcam
 
-Setup
-bash
-Clone the repository
-git clone https://github.com/yourusername/AI-Safety-System.git
-cd AI-Safety-System
-
 Install dependencies
 pip install -r requirements.txt
 
