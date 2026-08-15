@@ -1,0 +1,149 @@
+Python code:
+import cv2
+import serial
+import time
+import numpy as np
+import os
+from ultralytics import YOLO
+
+arduino = serial.Serial('COM3', 9600, timeout=1)  
+time.sleep(2) 
+
+model = YOLO("yolov8n.pt")
+
+cap = cv2.VideoCapture(0)
+
+folder_path = r"C:\Users\Asus\OneDrive\Documents\Desktop"  
+os.makedirs(folder_path, exist_ok=True)
+
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+out = None
+recording = False
+photo_saved = False
+buzzer_on = False
+timestamp = None
+prev_positions = []
+
+
+harassment_frames = 0
+harassment_threshold = 3  
+
+print("AI Women Safety System Started")
+
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.resize(frame, (640,480))
+    clean_frame = frame.copy()
+
+    results = model(frame)
+    persons = []
+
+    for r in results:
+        for box in r.boxes:
+            if int(box.cls[0]) == 0:  # person
+                x1,y1,x2,y2 = map(int, box.xyxy[0])
+                cx = int((x1+x2)/2)
+                cy = int((y1+y2)/2)
+                persons.append((cx,cy))
+                cv2.rectangle(frame,(x1,y1),(x2,y2),(0,255,0),2)
+                cv2.circle(frame,(cx,cy),5,(0,0,255),-1)
+
+    harassment = False
+    harassment_type = ""
+
+    suspicious = False
+    for i in range(len(persons)):
+        for j in range(i+1,len(persons)):
+            x1,y1 = persons[i]
+            x2,y2 = persons[j]
+
+            distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            movement = 0
+            if len(prev_positions) > i:
+                px,py = prev_positions[i]
+                movement = np.sqrt((x1 - px)**2 + (y1 - py)**2)
+
+            print("Distance:", distance, "Movement:", movement)
+
+            if distance < 100 and movement > 40:
+                suspicious = True
+                harassment_type = "Aggressive Touch / Approach"
+                cv2.line(frame,(x1,y1),(x2,y2),(0,0,255),3)
+
+
+    if len(persons) >= 3:
+        center_x = np.mean([p[0] for p in persons])
+        center_y = np.mean([p[1] for p in persons])
+        close_count = sum(
+            np.sqrt((p[0]-center_x)**2 + (p[1]-center_y)**2) < 120
+            for p in persons
+        )
+        if close_count >= 3:
+            suspicious = True
+            harassment_type = "Group Harassment"
+
+    if suspicious:
+        harassment_frames += 1
+    else:
+        harassment_frames = 0
+
+    if harassment_frames >= harassment_threshold:
+        harassment = True
+    else:
+        harassment = False
+
+    prev_positions = persons.copy()
+
+   
+    if harassment:
+        if not recording:
+            timestamp = int(time.time())
+            video_name = f"harassment_{timestamp}.mp4"
+            video_path = os.path.join(folder_path, video_name)
+            photo_name = f"harassment_{timestamp}.jpg"
+            photo_path = os.path.join(folder_path, photo_name)
+            out = cv2.VideoWriter(video_path, fourcc, 20.0, (640,480))
+            recording = True
+            photo_saved = False
+            print("Recording Started:", video_name)
+
+        if not photo_saved:
+            cv2.imwrite(photo_path, clean_frame)
+            photo_saved = True
+            print("Photo Saved:", photo_name)
+
+        if not buzzer_on:
+            arduino.write("1".encode())
+            buzzer_on = True
+
+        cv2.putText(frame, f"HARASSMENT: {harassment_type}",
+                    (40,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+    else:
+        cv2.putText(frame, "NORMAL",
+                    (250,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 3)
+
+        
+        if buzzer_on:
+            arduino.write("0".encode())
+            buzzer_on = False
+
+    if recording and out is not None:
+        out.write(clean_frame)
+
+    cv2.imshow("Women Safety AI Camera", frame)
+    if cv2.waitKey(1) == 27:  # ESC
+        break
+
+
+cap.release()
+if out is not None:
+    out.release()
+arduino.write("0".encode())
+arduino.close()
+cv2.destroyAllWindows()
+print("System Stopped")
