@@ -1,0 +1,42 @@
+Buzzer code:
+int buzzer = 8;
+
+void setup() {
+  pinMode(buzzer, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char c = Serial.read();
+    if (c == '1') {
+      digitalWrite(buzzer, HIGH);
+    } else if (c == '0') {
+      digitalWrite(buzzer, LOW);
+    }
+  }
+}
+Arduino code:
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+
+    if (command == '1') {
+      digitalWrite(LED_BUILTIN, HIGH);
+    }
+    else if (command == '0') {
+      digitalWrite(LED_BUILTIN, LOW);
+    }
+  }
+}
+oid setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  Serial.begin(9600);
+}
+
+
